@@ -1,0 +1,95 @@
+from functools import wraps
+from keras.layers import Conv2D, Add, ZeroPadding2D, UpSampling2D, Concatenate, MaxPooling2D
+from keras.layers.advanced_activations import LeakyReLU
+from keras.layers.normalization import BatchNormalization
+from keras.regularizers import l2
+from utils.utils import compose
+
+
+#--------------------------------------------------#
+#   单次卷积
+#--------------------------------------------------#
+@wraps(Conv2D)
+def DarknetConv2D(*args, **kwargs):
+    darknet_conv_kwargs = {'kernel_regularizer': l2(5e-4)}
+    darknet_conv_kwargs['padding'] = 'valid' if kwargs.get('strides')==(2,2) else 'same'
+    darknet_conv_kwargs.update(kwargs)
+    return Conv2D(*args, **darknet_conv_kwargs)
+
+#---------------------------------------------------#
+#   卷积块
+#   DarknetConv2D + BatchNormalization + LeakyReLU
+#---------------------------------------------------#
+def DarknetConv2D_BN_Leaky(*args, **kwargs):
+    no_bias_kwargs = {'use_bias': False}
+    no_bias_kwargs.update(kwargs)
+    return compose(
+        DarknetConv2D(*args, **no_bias_kwargs),
+        BatchNormalization(),
+        LeakyReLU(alpha=0.1))
+
+#---------------------------------------------------#
+#   卷积块
+#   DarknetConv2D + BatchNormalization + LeakyReLU
+#---------------------------------------------------#
+def resblock_body(x, num_filters, num_blocks):
+    x = ZeroPadding2D(((1,0),(1,0)))(x)
+    x = DarknetConv2D_BN_Leaky(num_filters, (3,3), strides=(2,2))(x)
+    for i in range(num_blocks):
+        y = DarknetConv2D_BN_Leaky(num_filters//2, (1,1))(x)
+        y = DarknetConv2D_BN_Leaky(num_filters, (3,3))(y)
+        x = Add()([x,y])
+    return x
+
+#---------------------------------------------------#
+#   darknet53 的主体部分
+#---------------------------------------------------#
+def darknet_body(x):
+    x = DarknetConv2D_BN_Leaky(32, (3,3))(x)
+    x = resblock_body(x, 64, 1)
+    x = resblock_body(x, 128, 2)
+    x = resblock_body(x, 256, 8)
+    feat1 = x
+    x = resblock_body(x, 512, 8)
+    feat2 = x
+    x = resblock_body(x, 1024, 4)
+    feat3 = x
+    return feat1,feat2,feat3
+
+# 利用keras框架构造了一个darknet-53的特征提取网络
+# 里面包含的方法有
+# 单次卷积 卷积块 残差结构
+
+# 再明确一个点就是输入的图片经过我们的darknet的特征提取网络之后会得到三个特征
+# 但是这三个特征里面并不是我们需要的信息
+# 需要的信息要再进行一次上采样和1次3*3的卷积和1*1的卷积才能得到
+# 所以还需要卷积和上采样的一个函数
+# 也就是下面的函数
+
+
+# ---------------------------------------------------#
+#   特征层->最后的输出
+# ---------------------------------------------------#
+def make_last_layers(x, num_filters, out_filters):
+    # 五次卷积
+    # 在结构图上可以看出来
+    # 在经过darknet-53的特征提取之后
+    # 每个feats都会进行一个5次卷积的过程
+    x = DarknetConv2D_BN_Leaky(num_filters, (1, 1))(x)
+    x = DarknetConv2D_BN_Leaky(num_filters * 2, (3, 3))(x)
+    x = DarknetConv2D_BN_Leaky(num_filters, (1, 1))(x)
+    x = DarknetConv2D_BN_Leaky(num_filters * 2, (3, 3))(x)
+    x = DarknetConv2D_BN_Leaky(num_filters, (1, 1))(x)
+
+    # 以及下面的一次3*3的卷积和1*1的卷积
+    # 将最后的通道数调整为outfilter
+    y = DarknetConv2D_BN_Leaky(num_filters * 2, (3, 3))(x)
+    y = DarknetConv2D(out_filters, (1, 1))(y)
+
+    return x, y
+
+# 在上面得到了feats1,feats2,feats3
+# 现在要得到最后的输出
+# 通过yolo_body函数来实现
+# 而yolo函数则写在yolo3_body.py文件中
+
