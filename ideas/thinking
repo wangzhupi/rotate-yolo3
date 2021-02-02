@@ -1,0 +1,14 @@
+目标检测的旋转框这一方面有很多参考和示例的代码在我的仓库中
+主要有下面两个做法
+1 . 预测x y w h angle 
+代码 : https://github.com/woshiwwwppp/ryolov3research-pytorch-master
+       https://github.com/wangzhupi/RotationDetection
+       https://github.com/wangzhupi/AerialDetection
+       https://github.com/wangzhupi/rotate-yolov3
+       https://github.com/wangzhupi/R3Det_Tensorflow
+上述代码都是使用预测x y w h angle的偏移量来确定旋转框的
+
+2 . 预测 x1, y1 x2, y2 x3, y3 x4, y4
+代码 : https://github.com/wangzhupi/YOLOv3-quadrangle
+       https://github.com/wangzhupi/yolov3-polygon
+上述代码是通过预测四个点的包围框来实现旋转框
