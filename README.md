@@ -9,4 +9,7 @@
 
 # 可能现在的能力不够复现不了这篇文章但是在毕业之前会一点一点完善这个仓库
 
+# 因为github的网络有些波动所以我将一些简单的架构写在了
+   https://gitee.com/wangyuyan10/rotate-yolo3
+
 
